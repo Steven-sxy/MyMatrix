@@ -3,13 +3,6 @@
 @REM ================================================================================================
 
 :MatrixConfiguration
-
-	@REM 
-	set "XlsToDbcConfig=1"
-
-	@REM 
-	set "DbcToXlsConfig=1"
-
 	@REM The characters related to the message contained in the message column data,
 	@REM used to match the message column
 	set "MsgNameColumn=Msg Name"
@@ -107,26 +100,13 @@
 			@REM convert *.csv file to *.dbc file
 
 			echo %0 %1 > !AutoToolOutputFile!
-
-			if "!XlsToDbcConfig!"=="1" (
-
-				goto Csv_To_Dbc
-			)
+			goto CSV_To_DBC
 		)^
 		else if /i "!onlyExtensionInputFile!"==".dbc" (
 			@REM convert *.dbc file to *.csv file
 
 			echo %0 %1 > !AutoToolOutputFile!
-
-			if "!OneIsAllFlg!"=="1" (
-
-				call:OneIsAll !onlyNameInputFile!.dbc
-			)
-
-			if "!DbcToXlsConfig!"=="1" (
-
-				goto Dbc_To_Csv
-			)
+			goto Dbc_To_Csv
 		)^
 		else (
 			@REM condition is not stafisy, end conversion
@@ -1125,11 +1105,21 @@
 		goto CsvToXls
 	)
 
-	call:XlsFileConversion
+	:XlsFileConversion
 
 	set "ConversionSuccessFlg=true"
 
-	goto EndConversion
+	@REM 
+	if /i "!OneIsAllFlg!"=="1" (
+
+		@REM 
+		set "DBCFileName=!onlyNameInputFile!.dbc"
+
+		goto OneIsAll
+	)^
+	else (
+		goto EndConversion
+	)
 
 @REM ================================================================================================
 @REM ====================================   End: DBC Conversion  ====================================
@@ -1141,7 +1131,7 @@
 @REM ================================================================================================
 
 @REM convert *.csv file to *.dbc file
-:Csv_To_Dbc
+:CSV_To_DBC
 
     @REM conversion output file
 	set outputFile=!onlyNameInputFile!.dbc
@@ -2334,7 +2324,10 @@
 	@REM End convert *.csv file to *.dbc file
 	if /i "!OneIsAllFlg!"=="1" (
 
-		call:OneIsAll %outputFile%
+		@REM 
+		set "DBCFileName=%outputFile%"
+
+		goto OneIsAll
 	)^
 	else (
 		goto EndConversion
@@ -2451,7 +2444,7 @@
 	start !tempVbsFile!
 
 	@REM 
-	goto:eof
+	goto XlsFileConversion
 
 @REM ================================================================================================
 @REM ====================================   End: VBS Script  ========================================
@@ -2465,7 +2458,6 @@
 @REM 附加功能，生成节点交互图、简易的底层通信报文结构体
 :OneIsAll
 
-	set "DBCFileName=%1"
 	if exist !DBCFileName! (
 
 		@REM 
@@ -2516,6 +2508,13 @@
 		echo #define !onlyNameInputFile!_H >> !generateBSWCodeHeaderFile!
 		echo, >> !generateBSWCodeHeaderFile!
 		echo, >> !generateBSWCodeHeaderFile!
+
+		if "!SourceCommentFlg!"=="" (
+
+			echo /* ----------------------------------------------------------------------------- >> !generateBSWCodeHeaderFile!
+			echo    Signal Structures >> !generateBSWCodeHeaderFile!
+			echo ----------------------------------------------------------------------------- */ >> !generateBSWCodeHeaderFile!
+		)
 		
 		FOR /F "skip=36 tokens=* usebackq" %%Z in ("!DBCFileName!") do (
 
@@ -2616,6 +2615,12 @@
 						echo typedef struct _c_!tmpGraphvizSendMsg!_msgTypeTag >> !generateBSWCodeHeaderFile!
 						echo { >> !generateBSWCodeHeaderFile!
 
+						if "!SourceCommentFlg!"=="" (
+
+							echo /* ----------------------------------------------------------------------------- >> !tmpHearderFile!
+							echo    Message Unions >> !tmpHearderFile!
+							echo ----------------------------------------------------------------------------- */ >> !tmpHearderFile!
+						)
 						echo typedef union _c_!tmpGraphvizSendMsg!_bufTag >> !tmpHearderFile!
 						echo { >> !tmpHearderFile!
 						echo 	unsigned char _c[8]; >> !tmpHearderFile!
@@ -2623,8 +2628,16 @@
 						echo } _c_!tmpGraphvizSendMsg!_buf; >> !tmpHearderFile!
 						echo, >> !tmpHearderFile!
 
+						if "!SourceCommentFlg!"=="" (
+
+							echo /* ----------------------------------------------------------------------------- >> tmpExternHeaderFile.h
+							echo    Message Buffers >> tmpExternHeaderFile.h
+							echo ----------------------------------------------------------------------------- */ >> tmpExternHeaderFile.h
+						)
 						echo extern _c_!tmpGraphvizSendMsg!_buf !tmpGraphvizSendMsg!; >> tmpExternHeaderFile.h
 						echo _c_!tmpGraphvizSendMsg!_buf !tmpGraphvizSendMsg!; >> !generateBSWCodeSourceFile!
+
+						set "SourceCommentFlg=true"
 					)
 
 				)^
@@ -2683,7 +2696,7 @@
 	set "ConversionSuccessFlg=true"
 
 	@REM 
-	goto:eof
+	goto EndConversion
 @REM ================================================================================================
 @REM ====================================   End: Graphviz  ==========================================
 @REM ================================================================================================
